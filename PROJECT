@@ -1,0 +1,6 @@
+domain: resolvulator.io
+layout:
+- go.kubebuilder.io/v3
+projectName: resolvulator
+repo: github.com/perdasilva/resolvulator
+version: "3"
