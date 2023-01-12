@@ -3,4 +3,14 @@ layout:
 - go.kubebuilder.io/v3
 projectName: resolvulator
 repo: github.com/perdasilva/resolvulator
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: resolvulator.io
+  group: resolvulator
+  kind: Item
+  path: github.com/perdasilva/resolvulator/api/v1alpha1
+  version: v1alpha1
 version: "3"

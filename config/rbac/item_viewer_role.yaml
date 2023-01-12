@@ -1,0 +1,27 @@
+# permissions for end users to view items.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: item-viewer-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: resolvulator
+    app.kubernetes.io/part-of: resolvulator
+    app.kubernetes.io/managed-by: kustomize
+  name: item-viewer-role
+rules:
+- apiGroups:
+  - resolvulator.resolvulator.io
+  resources:
+  - items
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - resolvulator.resolvulator.io
+  resources:
+  - items/status
+  verbs:
+  - get
