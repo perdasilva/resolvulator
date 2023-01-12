@@ -23,23 +23,32 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
+const (
+	PhaseNewlyCreated             = ""
+	PhaseReachingContextConsensus = "ReachingContextConsensus"
+	PhaseResolving                = "Resolving"
+	PhaseUnpacking                = "Unpacking"
+	PhaseInstalling               = "Installing"
+	PhaseInstalled                = "Installed"
+)
+
 // ItemSpec defines the desired state of Item
 type ItemSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
-	// Foo is an example field of Item. Edit item_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	Dependencies []string `json:"dependencies,omitempty"`
 }
 
 // ItemStatus defines the observed state of Item
 type ItemStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	Phase              string             `json:"phase,omitempty"`
+	ObservedGeneration int64              `json:"observedGeneration,omitempty"`
+	Conditions         []metav1.Condition `json:"conditions,omitempty"`
 }
 
 //+kubebuilder:object:root=true
+//+kubebuilder:resource:scope=Cluster
 //+kubebuilder:subresource:status
+//+kubebuilder:printcolumn:name=Phase,type=string,JSONPath=`.status.phase`
+//+kubebuilder:printcolumn:name=Age,type=date,JSONPath=`.metadata.creationTimestamp`
 
 // Item is the Schema for the items API
 type Item struct {

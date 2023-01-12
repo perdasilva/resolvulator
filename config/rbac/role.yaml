@@ -1,0 +1,33 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: null
+  name: manager-role
+rules:
+- apiGroups:
+  - resolvulator.resolvulator.io
+  resources:
+  - items
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - resolvulator.resolvulator.io
+  resources:
+  - items/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - resolvulator.resolvulator.io
+  resources:
+  - items/status
+  verbs:
+  - get
+  - patch
+  - update
