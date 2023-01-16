@@ -26,10 +26,16 @@ import (
 const (
 	PhaseNewlyCreated             = ""
 	PhaseReachingContextConsensus = "ReachingContextConsensus"
-	PhaseResolving                = "Resolving"
+	PhaseLocalResolution          = "LocalResolution"
+	PhaseGlobalResolution         = "GlobalResolution"
 	PhaseUnpacking                = "Unpacking"
 	PhaseInstalling               = "Installing"
 	PhaseInstalled                = "Installed"
+
+	ConditionGlobalResolutionSucceeded = "GlobalResolutionSucceeded"
+	ConditionLocalResolutionSucceeded  = "LocalResolutionSucceeded"
+	ConditionUnpacked                  = "BundleUnpacked"
+	ConditionInstalled                 = "BundleInstalled"
 )
 
 // ItemSpec defines the desired state of Item
