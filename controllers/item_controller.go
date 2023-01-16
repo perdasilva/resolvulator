@@ -28,7 +28,9 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
 const resolvulatorFinalizerName = "resolvulator.io/finalizer"
@@ -83,17 +85,42 @@ func (r *ItemReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	// reconcile item
 	switch item.Status.Phase {
 	case resolvulatorv1alpha1.PhaseNewlyCreated:
-		return ctrl.Result{}, r.updatePhase(ctx, item, resolvulatorv1alpha1.PhaseReachingContextConsensus)
-	case resolvulatorv1alpha1.PhaseReachingContextConsensus:
-		r.resolver.Enqueue()
+		return ctrl.Result{}, r.updatePhase(ctx, item, resolvulatorv1alpha1.PhaseLocalResolution)
+	case resolvulatorv1alpha1.PhaseLocalResolution:
+		if meta.FindStatusCondition(item.Status.Conditions, resolvulatorv1alpha1.ConditionLocalResolutionSucceeded) == nil {
+			err := r.resolver.RunLocalResolution(ctx, item)
+			if err != nil {
+				meta.SetStatusCondition(&item.Status.Conditions, v1.Condition{
+					Type:               resolvulatorv1alpha1.ConditionLocalResolutionSucceeded,
+					Status:             v1.ConditionFalse,
+					ObservedGeneration: item.Generation,
+					Reason:             "ResolutionFailure",
+					Message:            err.Error(),
+				})
+			} else {
+				meta.SetStatusCondition(&item.Status.Conditions, v1.Condition{
+					Type:               resolvulatorv1alpha1.ConditionLocalResolutionSucceeded,
+					Status:             v1.ConditionTrue,
+					ObservedGeneration: item.Generation,
+					Reason:             "ResolutionSuccess",
+					Message:            "Local item resolution succeeded",
+				})
+				item.Status.Phase = resolvulatorv1alpha1.PhaseGlobalResolution
+			}
+			return ctrl.Result{}, r.Client.Status().Update(ctx, item)
+		}
 		return ctrl.Result{}, nil
-	case resolvulatorv1alpha1.PhaseResolving:
-		r.resolver.Enqueue()
+	case resolvulatorv1alpha1.PhaseGlobalResolution:
+		if meta.FindStatusCondition(item.Status.Conditions, resolvulatorv1alpha1.ConditionGlobalResolutionSucceeded) == nil {
+			r.resolver.Enqueue()
+		} else if meta.IsStatusConditionTrue(item.Status.Conditions, resolvulatorv1alpha1.ConditionGlobalResolutionSucceeded) {
+			return ctrl.Result{}, r.updatePhase(ctx, item, resolvulatorv1alpha1.PhaseUnpacking)
+		}
 		return ctrl.Result{}, nil
 	case resolvulatorv1alpha1.PhaseUnpacking:
 		meta.SetStatusCondition(&item.Status.Conditions, v1.Condition{
-			Type:               "BundleUnpack",
-			Status:             "False",
+			Type:               resolvulatorv1alpha1.ConditionUnpacked,
+			Status:             v1.ConditionFalse,
 			ObservedGeneration: item.Generation,
 			Reason:             "BundleNotUnpacked",
 			Message:            "Bundle is still unpacking",
@@ -101,25 +128,25 @@ func (r *ItemReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		return ctrl.Result{}, r.waitAndUpdatePhase(ctx, item, resolvulatorv1alpha1.PhaseInstalling)
 	case resolvulatorv1alpha1.PhaseInstalling:
 		meta.SetStatusCondition(&item.Status.Conditions, v1.Condition{
-			Type:               "BundleUnpack",
-			Status:             "True",
+			Type:               resolvulatorv1alpha1.ConditionUnpacked,
+			Status:             v1.ConditionTrue,
 			ObservedGeneration: item.Generation,
 			Reason:             "BundleUnpacked",
 			Message:            "Bundle successfully unpacked",
 		})
 		meta.SetStatusCondition(&item.Status.Conditions, v1.Condition{
-			Type:               "BundleInstalled",
-			Status:             "False",
+			Type:               resolvulatorv1alpha1.ConditionInstalled,
+			Status:             v1.ConditionFalse,
 			ObservedGeneration: item.Generation,
 			Reason:             "BundleInstalling",
 			Message:            "Bundle is installing...",
 		})
 		return ctrl.Result{}, r.waitAndUpdatePhase(ctx, item, resolvulatorv1alpha1.PhaseInstalled)
 	case resolvulatorv1alpha1.PhaseInstalled:
-		if meta.FindStatusCondition(item.Status.Conditions, "BundleInstalled") == nil {
+		if !meta.IsStatusConditionTrue(item.Status.Conditions, resolvulatorv1alpha1.ConditionInstalled) {
 			meta.SetStatusCondition(&item.Status.Conditions, v1.Condition{
-				Type:               "BundleInstalled",
-				Status:             "True",
+				Type:               resolvulatorv1alpha1.ConditionInstalled,
+				Status:             v1.ConditionTrue,
 				ObservedGeneration: item.Generation,
 				Reason:             "BundleInstalled",
 				Message:            "Bundle successfully installed...",
@@ -127,6 +154,7 @@ func (r *ItemReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 			if err := r.Client.Status().Update(ctx, item); err != nil {
 				return ctrl.Result{}, client.IgnoreNotFound(err)
 			}
+			r.resolver.Reset()
 			return ctrl.Result{}, nil
 		}
 	}
@@ -136,8 +164,10 @@ func (r *ItemReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 // SetupWithManager sets up the controller with the Manager.
 func (r *ItemReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.resolver = NewResolver(context.Background(), r.Client)
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&resolvulatorv1alpha1.Item{}).
+		Watches(&source.Channel{Source: r.resolver.ReconciliationChannel()}, &handler.EnqueueRequestForObject{}).
 		Complete(r)
 }
 
