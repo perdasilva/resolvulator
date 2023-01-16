@@ -3,7 +3,6 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/eapache/channels"
@@ -16,7 +15,6 @@ import (
 
 type Resolver struct {
 	requestChannel    chan bool
-	mu                sync.RWMutex
 	ctx               context.Context
 	consensusDuration time.Duration
 	client            client.Client
@@ -26,7 +24,6 @@ type Resolver struct {
 func NewResolver(ctx context.Context, client client.Client) *Resolver {
 	resolver := &Resolver{
 		requestChannel:    make(chan bool),
-		mu:                sync.RWMutex{},
 		ctx:               ctx,
 		consensusDuration: 5 * time.Second,
 		client:            client,
