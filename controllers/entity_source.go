@@ -14,6 +14,7 @@ const (
 	EntityPropertyStatus                 = "entity.property.status"
 	EntityPropertyInstalled              = "entity.property.installed"
 	EntityPropertyDependencies           = "entity.property.dependencies"
+	EntityPropertyConflicts              = "entity.property.conflicts"
 	EntityPropertyLocalResolutionFailed  = "entity.property.localResolutionSucceeded"
 	EntityPropertyGlobalResolutionFailed = "entity.property.globalResolutionFailed"
 )
@@ -28,12 +29,14 @@ func NewEntitySource(items []v1alpha1.Item) *EntitySource {
 		itemID := deppy.Identifier(item.GetName())
 		itemStatus := item.Status.Phase
 		itemDependencies := strings.Join(item.Spec.Dependencies, ",")
+		itemConflicts := strings.Join(item.Spec.Conflicts, ",")
 		itemInstalled := meta.IsStatusConditionTrue(item.Status.Conditions, v1alpha1.ConditionInstalled)
 		localResolutionFailed := meta.IsStatusConditionFalse(item.Status.Conditions, v1alpha1.ConditionLocalResolutionSucceeded)
 		globalResolutionFailed := meta.IsStatusConditionFalse(item.Status.Conditions, v1alpha1.ConditionGlobalResolutionSucceeded)
 		itemEntity := input.NewEntity(itemID, map[string]string{
 			EntityPropertyStatus:                 itemStatus,
 			EntityPropertyDependencies:           itemDependencies,
+			EntityPropertyConflicts:              itemConflicts,
 			EntityPropertyInstalled:              fmt.Sprintf("%t", itemInstalled),
 			EntityPropertyLocalResolutionFailed:  fmt.Sprintf("%t", localResolutionFailed),
 			EntityPropertyGlobalResolutionFailed: fmt.Sprintf("%t", globalResolutionFailed),

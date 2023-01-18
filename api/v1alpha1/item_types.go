@@ -41,6 +41,7 @@ const (
 // ItemSpec defines the desired state of Item
 type ItemSpec struct {
 	Dependencies []string `json:"dependencies,omitempty"`
+	Conflicts    []string `json:"conflicts,omitempty"`
 }
 
 // ItemStatus defines the observed state of Item

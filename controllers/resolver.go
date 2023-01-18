@@ -186,7 +186,7 @@ func (r *Resolver) resolve(reset bool) {
 	} else {
 		for _, item := range itemList.Items {
 			if meta.IsStatusConditionTrue(item.Status.Conditions, v1alpha1.ConditionLocalResolutionSucceeded) &&
-				!meta.IsStatusConditionTrue(item.Status.Conditions, v1alpha1.ConditionGlobalResolutionSucceeded) {
+				meta.FindStatusCondition(item.Status.Conditions, v1alpha1.ConditionGlobalResolutionSucceeded) == nil {
 				meta.SetStatusCondition(&item.Status.Conditions, v1.Condition{
 					Type:               v1alpha1.ConditionGlobalResolutionSucceeded,
 					Status:             v1.ConditionTrue,
