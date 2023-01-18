@@ -36,9 +36,8 @@ func NewItemVariableSource(items ...v1alpha1.Item) *ItemVariableSource {
 
 func (i *ItemVariableSource) GetVariables(ctx context.Context, entitySource input.EntitySource) ([]deppy.Variable, error) {
 	var variables []deppy.Variable
-	installedVariables := map[deppy.Identifier]*struct{}{}
+	createdVariables := map[deppy.Identifier]*struct{}{}
 	err := entitySource.Iterate(ctx, func(entity *input.Entity) error {
-		dependencies := strings.Split(entity.Properties[EntityPropertyDependencies], ",")
 		installed, err := strconv.ParseBool(entity.Properties[EntityPropertyInstalled])
 		if err != nil {
 			return fmt.Errorf("error parsing entity property (%s) to boolean: %s", EntityPropertyInstalled, err)
@@ -60,39 +59,70 @@ func (i *ItemVariableSource) GetVariables(ctx context.Context, entitySource inpu
 
 		var variableID deppy.Identifier
 		if installed {
-			variableID = deppy.IdentifierFromString(fmt.Sprintf("%s%s%s", VariablePrefixInstalled, VariablePrefixSeparator, entity.ID))
-			installedVariables[variableID] = &struct{}{}
+			variableID = installedVariableID(entity.ID)
 		} else {
-			variableID = deppy.IdentifierFromString(fmt.Sprintf("%s%s%s", VariablePrefixRequired, VariablePrefixSeparator, entity.ID))
+			variableID = requiredVariableID(entity.ID)
 		}
+		createdVariables[variableID] = &struct{}{}
 
 		variable := input.NewSimpleVariable(variableID)
-		if !localResolutionFailed || !globalResolutionFailed {
+		if !localResolutionFailed && !globalResolutionFailed {
 			variable.AddConstraint(constraint.Mandatory())
 		} else {
 			variable.AddConstraint(constraint.Prohibited())
 		}
+
+		// add dependency constraints
+		dependencies := strings.Split(entity.Properties[EntityPropertyDependencies], ",")
 		for _, dependency := range dependencies {
-			dependency := strings.TrimSpace(dependency)
+			dependency := deppy.IdentifierFromString(strings.TrimSpace(dependency))
 			if dependency == "" {
 				continue
 			}
-			dependencyID := deppy.IdentifierFromString(fmt.Sprintf("installed/%s", dependency))
-			if _, ok := installedVariables[dependencyID]; !ok {
-				installedVariables[dependencyID] = nil
+			dependencyID := installedVariableID(dependency)
+			if _, ok := createdVariables[dependencyID]; !ok {
+				createdVariables[dependencyID] = nil
 			}
 			variable.AddConstraint(constraint.Dependency(dependencyID))
 		}
+
+		// add conflict constraints
+		conflicts := strings.Split(entity.Properties[EntityPropertyConflicts], ",")
+		for _, conflict := range conflicts {
+			conflict := deppy.IdentifierFromString(strings.TrimSpace(conflict))
+			if conflict == "" {
+				continue
+			}
+			installedVarID := installedVariableID(conflict)
+			if _, ok := createdVariables[installedVarID]; !ok {
+				createdVariables[installedVarID] = nil
+			}
+			requiredVarID := requiredVariableID(conflict)
+			if _, ok := createdVariables[requiredVarID]; !ok {
+				createdVariables[requiredVarID] = nil
+			}
+			variable.AddConstraint(constraint.Conflict(installedVarID))
+			variable.AddConstraint(constraint.Conflict(requiredVarID))
+		}
+
 		variables = append(variables, variable)
 		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
-	for variableID, installedVariable := range installedVariables {
-		if installedVariable == nil {
-			variables = append(variables, input.NewSimpleVariable(variableID, constraint.Prohibited()))
+	for variableID, variable := range createdVariables {
+		if variable == nil {
+			variables = append(variables, input.NewSimpleVariable(variableID))
 		}
 	}
 	return variables, nil
+}
+
+func installedVariableID(entityID deppy.Identifier) deppy.Identifier {
+	return deppy.IdentifierFromString(fmt.Sprintf("%s%s%s", VariablePrefixInstalled, VariablePrefixSeparator, entityID))
+}
+
+func requiredVariableID(entityID deppy.Identifier) deppy.Identifier {
+	return deppy.IdentifierFromString(fmt.Sprintf("%s%s%s", VariablePrefixRequired, VariablePrefixSeparator, entityID))
 }

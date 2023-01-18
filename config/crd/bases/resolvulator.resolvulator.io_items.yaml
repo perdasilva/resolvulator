@@ -42,6 +42,10 @@ spec:
           spec:
             description: ItemSpec defines the desired state of Item
             properties:
+              conflicts:
+                items:
+                  type: string
+                type: array
               dependencies:
                 items:
                   type: string
