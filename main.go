@@ -43,7 +43,6 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-
 	utilruntime.Must(resolvulatorv1alpha1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
@@ -89,11 +88,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controllers.ItemReconciler{
+	if err = (&controllers.ThingReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Item")
+		setupLog.Error(err, "unable to create controller", "controller", "Thing")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder

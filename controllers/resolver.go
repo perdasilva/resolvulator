@@ -107,27 +107,27 @@ func (r *Resolver) watchResolutionQueue() {
 }
 
 func (r *Resolver) resolve(reset bool) {
-	itemList := v1alpha1.ItemList{}
-	if err := r.client.List(r.ctx, &itemList); err != nil {
+	thingList := v1alpha1.ThingList{}
+	if err := r.client.List(r.ctx, &thingList); err != nil {
 		// TODO (perdasilva): make this more robust as it could lead to dead cycles
 		return
 	}
 
-	// move items to resolving state
+	// move things to resolving state
 	puntToNextCycle := false
-	for _, item := range itemList.Items {
+	for _, thing := range thingList.Items {
 		if reset {
-			if !meta.IsStatusConditionTrue(item.Status.Conditions, v1alpha1.ConditionGlobalResolutionSucceeded) {
-				itemCopy := *item.DeepCopy()
-				itemCopy.Status.Phase = v1alpha1.PhaseLocalResolution
-				meta.RemoveStatusCondition(&itemCopy.Status.Conditions, v1alpha1.ConditionLocalResolutionSucceeded)
-				meta.RemoveStatusCondition(&itemCopy.Status.Conditions, v1alpha1.ConditionGlobalResolutionSucceeded)
-				if err := r.client.Status().Update(r.ctx, &itemCopy); err != nil {
-					r.reconcile(&item)
+			if !meta.IsStatusConditionTrue(thing.Status.Conditions, v1alpha1.ConditionGlobalResolutionSucceeded) {
+				thingCopy := *thing.DeepCopy()
+				thingCopy.Status.Phase = v1alpha1.PhaseLocalResolution
+				meta.RemoveStatusCondition(&thingCopy.Status.Conditions, v1alpha1.ConditionLocalResolutionSucceeded)
+				meta.RemoveStatusCondition(&thingCopy.Status.Conditions, v1alpha1.ConditionGlobalResolutionSucceeded)
+				if err := r.client.Status().Update(r.ctx, &thingCopy); err != nil {
+					r.reconcile(&thing)
 				}
 				puntToNextCycle = true
 			}
-		} else if meta.FindStatusCondition(item.Status.Conditions, v1alpha1.ConditionLocalResolutionSucceeded) == nil {
+		} else if meta.FindStatusCondition(thing.Status.Conditions, v1alpha1.ConditionLocalResolutionSucceeded) == nil {
 			puntToNextCycle = true
 		}
 	}
@@ -137,15 +137,15 @@ func (r *Resolver) resolve(reset bool) {
 		return
 	}
 
-	if len(itemList.Items) == 0 {
+	if len(thingList.Items) == 0 {
 		return
 	}
 
-	err := r.RunGlobalResolution(r.ctx, itemList.Items...)
+	err := r.RunGlobalResolution(r.ctx, thingList.Items...)
 	if err != nil {
 		// hack: block anything that is trying to be installed
 		// in the error path
-		itemUpdated := map[string]struct{}{}
+		thingUpdated := map[string]struct{}{}
 		switch err.(type) {
 		case deppy.NotSatisfiable:
 			for _, appliedConstraint := range err.(deppy.NotSatisfiable) {
@@ -154,47 +154,47 @@ func (r *Resolver) resolve(reset bool) {
 				if isInstalled {
 					continue
 				}
-				itemName := strings.TrimSpace(variableID[strings.Index(variableID, VariablePrefixSeparator)+1:])
-				if _, ok := itemUpdated[itemName]; ok {
+				thingName := strings.TrimSpace(variableID[strings.Index(variableID, VariablePrefixSeparator)+1:])
+				if _, ok := thingUpdated[thingName]; ok {
 					continue
 				}
-				for _, item := range itemList.Items {
-					if item.GetName() == itemName {
-						meta.SetStatusCondition(&item.Status.Conditions, v1.Condition{
+				for _, thing := range thingList.Items {
+					if thing.GetName() == thingName {
+						meta.SetStatusCondition(&thing.Status.Conditions, v1.Condition{
 							Type:               v1alpha1.ConditionGlobalResolutionSucceeded,
 							Status:             v1.ConditionFalse,
-							ObservedGeneration: item.Generation,
+							ObservedGeneration: thing.Generation,
 							Reason:             "ResolutionFailure",
 							Message:            err.Error(),
 						})
-						if err := r.client.Status().Update(r.ctx, &item); err != nil {
+						if err := r.client.Status().Update(r.ctx, &thing); err != nil {
 							// re-run global resolution
 							r.Enqueue()
 							return
 						}
-						itemUpdated[itemName] = struct{}{}
+						thingUpdated[thingName] = struct{}{}
 					}
 				}
 			}
 		}
 
-		// enqueue another resolution for the other items
+		// enqueue another resolution for the other things
 		// that might not be responsible for the failures
-		if len(itemUpdated) < len(itemList.Items) {
+		if len(thingUpdated) < len(thingList.Items) {
 			r.Enqueue()
 		}
 	} else {
-		for _, item := range itemList.Items {
-			if meta.IsStatusConditionTrue(item.Status.Conditions, v1alpha1.ConditionLocalResolutionSucceeded) &&
-				meta.FindStatusCondition(item.Status.Conditions, v1alpha1.ConditionGlobalResolutionSucceeded) == nil {
-				meta.SetStatusCondition(&item.Status.Conditions, v1.Condition{
+		for _, thing := range thingList.Items {
+			if meta.IsStatusConditionTrue(thing.Status.Conditions, v1alpha1.ConditionLocalResolutionSucceeded) &&
+				meta.FindStatusCondition(thing.Status.Conditions, v1alpha1.ConditionGlobalResolutionSucceeded) == nil {
+				meta.SetStatusCondition(&thing.Status.Conditions, v1.Condition{
 					Type:               v1alpha1.ConditionGlobalResolutionSucceeded,
 					Status:             v1.ConditionTrue,
-					ObservedGeneration: item.Generation,
+					ObservedGeneration: thing.Generation,
 					Reason:             "ResolutionSuccess",
-					Message:            "Global item resolution succeeded",
+					Message:            "Global thing resolution succeeded",
 				})
-				if err := r.client.Status().Update(r.ctx, &item); err != nil {
+				if err := r.client.Status().Update(r.ctx, &thing); err != nil {
 					r.Enqueue()
 					return
 				}
@@ -203,13 +203,13 @@ func (r *Resolver) resolve(reset bool) {
 	}
 }
 
-func (r *Resolver) RunLocalResolution(ctx context.Context, item *v1alpha1.Item) error {
-	itemList := v1alpha1.ItemList{}
-	if err := r.client.List(r.ctx, &itemList); err != nil {
+func (r *Resolver) RunLocalResolution(ctx context.Context, thing *v1alpha1.Thing) error {
+	thingList := v1alpha1.ThingList{}
+	if err := r.client.List(r.ctx, &thingList); err != nil {
 		return err
 	}
-	entitySource := NewEntitySource(itemList.Items)
-	variableSource := NewItemVariableSource(*item)
+	entitySource := NewEntitySource(thingList.Items)
+	variableSource := NewThingVariableSource(*thing)
 	resolver, err := solver.NewDeppySolver(entitySource, variableSource)
 	if err != nil {
 		return err
@@ -218,9 +218,9 @@ func (r *Resolver) RunLocalResolution(ctx context.Context, item *v1alpha1.Item) 
 	return err
 }
 
-func (r *Resolver) RunGlobalResolution(ctx context.Context, items ...v1alpha1.Item) error {
-	entitySource := NewEntitySource(items)
-	variableSource := NewItemVariableSource(items...)
+func (r *Resolver) RunGlobalResolution(ctx context.Context, things ...v1alpha1.Thing) error {
+	entitySource := NewEntitySource(things)
+	variableSource := NewThingVariableSource(things...)
 	resolver, err := solver.NewDeppySolver(entitySource, variableSource)
 	if err != nil {
 		return err
@@ -229,9 +229,9 @@ func (r *Resolver) RunGlobalResolution(ctx context.Context, items ...v1alpha1.It
 	return err
 }
 
-func (r *Resolver) reconcile(item *v1alpha1.Item) {
+func (r *Resolver) reconcile(thing *v1alpha1.Thing) {
 	select {
 	case <-r.ctx.Done():
-	case r.reconciliationChannel <- event.GenericEvent{Object: item}:
+	case r.reconciliationChannel <- event.GenericEvent{Object: thing}:
 	}
 }

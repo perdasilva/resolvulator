@@ -5,14 +5,14 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.10.0
   creationTimestamp: null
-  name: items.resolvulator.resolvulator.io
+  name: things.resolvulator.resolvulator.io
 spec:
   group: resolvulator.resolvulator.io
   names:
-    kind: Item
-    listKind: ItemList
-    plural: items
-    singular: item
+    kind: Thing
+    listKind: ThingList
+    plural: things
+    singular: thing
   scope: Cluster
   versions:
   - additionalPrinterColumns:
@@ -25,7 +25,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: Item is the Schema for the items API
+        description: Thing is the Schema for the things API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -40,7 +40,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: ItemSpec defines the desired state of Item
+            description: ThingSpec defines the desired state of Thing
             properties:
               conflicts:
                 items:
@@ -52,7 +52,7 @@ spec:
                 type: array
             type: object
           status:
-            description: ItemStatus defines the observed state of Item
+            description: ThingStatus defines the observed state of Thing
             properties:
               conditions:
                 items:

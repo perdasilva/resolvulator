@@ -35,123 +35,123 @@ import (
 
 const resolvulatorFinalizerName = "resolvulator.io/finalizer"
 
-// ItemReconciler reconciles a Item object
-type ItemReconciler struct {
+// ThingReconciler reconciles a Thing object
+type ThingReconciler struct {
 	client.Client
 	Scheme   *runtime.Scheme
 	resolver *Resolver
 }
 
-//+kubebuilder:rbac:groups=resolvulator.resolvulator.io,resources=items,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=resolvulator.resolvulator.io,resources=items/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=resolvulator.resolvulator.io,resources=items/finalizers,verbs=update
+//+kubebuilder:rbac:groups=resolvulator.resolvulator.io,resources=things,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=resolvulator.resolvulator.io,resources=things/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=resolvulator.resolvulator.io,resources=things/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 // TODO(user): Modify the Reconcile function to compare the state specified by
-// the Item object against the actual cluster state, and then
+// the Thing object against the actual cluster state, and then
 // perform operations to make the cluster state reflect the state specified by
 // the user.
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.13.1/pkg/reconcile
-func (r *ItemReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *ThingReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
 
-	item := &resolvulatorv1alpha1.Item{}
-	if err := r.Client.Get(ctx, req.NamespacedName, item); err != nil {
+	thing := &resolvulatorv1alpha1.Thing{}
+	if err := r.Client.Get(ctx, req.NamespacedName, thing); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	// item is being deleted
-	if item.ObjectMeta.DeletionTimestamp.IsZero() {
-		if !controllerutil.ContainsFinalizer(item, resolvulatorFinalizerName) {
-			controllerutil.AddFinalizer(item, resolvulatorFinalizerName)
-			if err := r.Update(ctx, item); err != nil {
+	// thing is being deleted
+	if thing.ObjectMeta.DeletionTimestamp.IsZero() {
+		if !controllerutil.ContainsFinalizer(thing, resolvulatorFinalizerName) {
+			controllerutil.AddFinalizer(thing, resolvulatorFinalizerName)
+			if err := r.Update(ctx, thing); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
 	} else {
-		if controllerutil.ContainsFinalizer(item, resolvulatorFinalizerName) {
+		if controllerutil.ContainsFinalizer(thing, resolvulatorFinalizerName) {
 			r.resolver.Reset()
 			// remove our finalizer from the list and update it.
-			controllerutil.RemoveFinalizer(item, resolvulatorFinalizerName)
-			if err := r.Update(ctx, item); err != nil {
+			controllerutil.RemoveFinalizer(thing, resolvulatorFinalizerName)
+			if err := r.Update(ctx, thing); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
 	}
 
-	// reconcile item
-	switch item.Status.Phase {
+	// reconcile thing
+	switch thing.Status.Phase {
 	case resolvulatorv1alpha1.PhaseNewlyCreated:
-		return ctrl.Result{}, r.updatePhase(ctx, item, resolvulatorv1alpha1.PhaseLocalResolution)
+		return ctrl.Result{}, r.updatePhase(ctx, thing, resolvulatorv1alpha1.PhaseLocalResolution)
 	case resolvulatorv1alpha1.PhaseLocalResolution:
-		if meta.FindStatusCondition(item.Status.Conditions, resolvulatorv1alpha1.ConditionLocalResolutionSucceeded) == nil {
-			err := r.resolver.RunLocalResolution(ctx, item)
+		if meta.FindStatusCondition(thing.Status.Conditions, resolvulatorv1alpha1.ConditionLocalResolutionSucceeded) == nil {
+			err := r.resolver.RunLocalResolution(ctx, thing)
 			if err != nil {
-				meta.SetStatusCondition(&item.Status.Conditions, v1.Condition{
+				meta.SetStatusCondition(&thing.Status.Conditions, v1.Condition{
 					Type:               resolvulatorv1alpha1.ConditionLocalResolutionSucceeded,
 					Status:             v1.ConditionFalse,
-					ObservedGeneration: item.Generation,
+					ObservedGeneration: thing.Generation,
 					Reason:             "ResolutionFailure",
 					Message:            err.Error(),
 				})
 			} else {
-				meta.SetStatusCondition(&item.Status.Conditions, v1.Condition{
+				meta.SetStatusCondition(&thing.Status.Conditions, v1.Condition{
 					Type:               resolvulatorv1alpha1.ConditionLocalResolutionSucceeded,
 					Status:             v1.ConditionTrue,
-					ObservedGeneration: item.Generation,
+					ObservedGeneration: thing.Generation,
 					Reason:             "ResolutionSuccess",
-					Message:            "Local item resolution succeeded",
+					Message:            "Local thing resolution succeeded",
 				})
-				item.Status.Phase = resolvulatorv1alpha1.PhaseGlobalResolution
+				thing.Status.Phase = resolvulatorv1alpha1.PhaseGlobalResolution
 			}
-			return ctrl.Result{}, r.Client.Status().Update(ctx, item)
+			return ctrl.Result{}, r.Client.Status().Update(ctx, thing)
 		}
 		return ctrl.Result{}, nil
 	case resolvulatorv1alpha1.PhaseGlobalResolution:
-		if meta.FindStatusCondition(item.Status.Conditions, resolvulatorv1alpha1.ConditionGlobalResolutionSucceeded) == nil {
+		if meta.FindStatusCondition(thing.Status.Conditions, resolvulatorv1alpha1.ConditionGlobalResolutionSucceeded) == nil {
 			r.resolver.Enqueue()
-		} else if meta.IsStatusConditionTrue(item.Status.Conditions, resolvulatorv1alpha1.ConditionGlobalResolutionSucceeded) {
-			return ctrl.Result{}, r.updatePhase(ctx, item, resolvulatorv1alpha1.PhaseUnpacking)
+		} else if meta.IsStatusConditionTrue(thing.Status.Conditions, resolvulatorv1alpha1.ConditionGlobalResolutionSucceeded) {
+			return ctrl.Result{}, r.updatePhase(ctx, thing, resolvulatorv1alpha1.PhaseUnpacking)
 		}
 		return ctrl.Result{}, nil
 	case resolvulatorv1alpha1.PhaseUnpacking:
-		meta.SetStatusCondition(&item.Status.Conditions, v1.Condition{
+		meta.SetStatusCondition(&thing.Status.Conditions, v1.Condition{
 			Type:               resolvulatorv1alpha1.ConditionUnpacked,
 			Status:             v1.ConditionFalse,
-			ObservedGeneration: item.Generation,
+			ObservedGeneration: thing.Generation,
 			Reason:             "BundleNotUnpacked",
 			Message:            "Bundle is still unpacking",
 		})
-		return ctrl.Result{}, r.waitAndUpdatePhase(ctx, item, resolvulatorv1alpha1.PhaseInstalling)
+		return ctrl.Result{}, r.waitAndUpdatePhase(ctx, thing, resolvulatorv1alpha1.PhaseInstalling)
 	case resolvulatorv1alpha1.PhaseInstalling:
-		meta.SetStatusCondition(&item.Status.Conditions, v1.Condition{
+		meta.SetStatusCondition(&thing.Status.Conditions, v1.Condition{
 			Type:               resolvulatorv1alpha1.ConditionUnpacked,
 			Status:             v1.ConditionTrue,
-			ObservedGeneration: item.Generation,
+			ObservedGeneration: thing.Generation,
 			Reason:             "BundleUnpacked",
 			Message:            "Bundle successfully unpacked",
 		})
-		meta.SetStatusCondition(&item.Status.Conditions, v1.Condition{
+		meta.SetStatusCondition(&thing.Status.Conditions, v1.Condition{
 			Type:               resolvulatorv1alpha1.ConditionInstalled,
 			Status:             v1.ConditionFalse,
-			ObservedGeneration: item.Generation,
+			ObservedGeneration: thing.Generation,
 			Reason:             "BundleInstalling",
 			Message:            "Bundle is installing...",
 		})
-		return ctrl.Result{}, r.waitAndUpdatePhase(ctx, item, resolvulatorv1alpha1.PhaseInstalled)
+		return ctrl.Result{}, r.waitAndUpdatePhase(ctx, thing, resolvulatorv1alpha1.PhaseInstalled)
 	case resolvulatorv1alpha1.PhaseInstalled:
-		if !meta.IsStatusConditionTrue(item.Status.Conditions, resolvulatorv1alpha1.ConditionInstalled) {
-			meta.SetStatusCondition(&item.Status.Conditions, v1.Condition{
+		if !meta.IsStatusConditionTrue(thing.Status.Conditions, resolvulatorv1alpha1.ConditionInstalled) {
+			meta.SetStatusCondition(&thing.Status.Conditions, v1.Condition{
 				Type:               resolvulatorv1alpha1.ConditionInstalled,
 				Status:             v1.ConditionTrue,
-				ObservedGeneration: item.Generation,
+				ObservedGeneration: thing.Generation,
 				Reason:             "BundleInstalled",
 				Message:            "Bundle successfully installed...",
 			})
-			if err := r.Client.Status().Update(ctx, item); err != nil {
+			if err := r.Client.Status().Update(ctx, thing); err != nil {
 				return ctrl.Result{}, client.IgnoreNotFound(err)
 			}
 			r.resolver.Reset()
@@ -162,22 +162,22 @@ func (r *ItemReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *ItemReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *ThingReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.resolver = NewResolver(context.Background(), r.Client)
 
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&resolvulatorv1alpha1.Item{}).
+		For(&resolvulatorv1alpha1.Thing{}).
 		Watches(&source.Channel{Source: r.resolver.ReconciliationChannel()}, &handler.EnqueueRequestForObject{}).
 		Complete(r)
 }
 
-func (r *ItemReconciler) waitAndUpdatePhase(ctx context.Context, item *resolvulatorv1alpha1.Item, phase string) error {
+func (r *ThingReconciler) waitAndUpdatePhase(ctx context.Context, thing *resolvulatorv1alpha1.Thing, phase string) error {
 	time.Sleep(time.Duration(rand.Int63nRange(1, 3)) * time.Second)
-	return r.updatePhase(ctx, item, phase)
+	return r.updatePhase(ctx, thing, phase)
 }
 
-func (r *ItemReconciler) updatePhase(ctx context.Context, item *resolvulatorv1alpha1.Item, phase string) error {
-	itemCopy := item.DeepCopy()
-	itemCopy.Status.Phase = phase
-	return r.Client.Status().Update(ctx, itemCopy)
+func (r *ThingReconciler) updatePhase(ctx context.Context, thing *resolvulatorv1alpha1.Thing, phase string) error {
+	thingCopy := thing.DeepCopy()
+	thingCopy.Status.Phase = phase
+	return r.Client.Status().Update(ctx, thingCopy)
 }

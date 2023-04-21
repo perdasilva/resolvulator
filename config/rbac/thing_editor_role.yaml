@@ -1,20 +1,20 @@
-# permissions for end users to edit items.
+# permissions for end users to edit things.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   labels:
     app.kubernetes.io/name: clusterrole
-    app.kubernetes.io/instance: item-editor-role
+    app.kubernetes.io/instance: thing-editor-role
     app.kubernetes.io/component: rbac
     app.kubernetes.io/created-by: resolvulator
     app.kubernetes.io/part-of: resolvulator
     app.kubernetes.io/managed-by: kustomize
-  name: item-editor-role
+  name: thing-editor-role
 rules:
 - apiGroups:
   - resolvulator.resolvulator.io
   resources:
-  - items
+  - things
   verbs:
   - create
   - delete
@@ -26,6 +26,6 @@ rules:
 - apiGroups:
   - resolvulator.resolvulator.io
   resources:
-  - items/status
+  - things/status
   verbs:
   - get

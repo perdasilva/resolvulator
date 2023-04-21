@@ -12,7 +12,7 @@ import (
 	"github.com/perdasilva/resolvulator/api/v1alpha1"
 )
 
-var _ input.VariableSource = &ItemVariableSource{}
+var _ input.VariableSource = &ThingVariableSource{}
 
 const (
 	VariablePrefixRequired  = "required"
@@ -20,21 +20,21 @@ const (
 	VariablePrefixSeparator = "/"
 )
 
-type ItemVariableSource struct {
+type ThingVariableSource struct {
 	resolutionScope map[deppy.Identifier]struct{}
 }
 
-func NewItemVariableSource(items ...v1alpha1.Item) *ItemVariableSource {
+func NewThingVariableSource(things ...v1alpha1.Thing) *ThingVariableSource {
 	resolutionScope := map[deppy.Identifier]struct{}{}
-	for _, item := range items {
-		resolutionScope[deppy.IdentifierFromString(item.GetName())] = struct{}{}
+	for _, thing := range things {
+		resolutionScope[deppy.IdentifierFromString(thing.GetName())] = struct{}{}
 	}
-	return &ItemVariableSource{
+	return &ThingVariableSource{
 		resolutionScope: resolutionScope,
 	}
 }
 
-func (i *ItemVariableSource) GetVariables(ctx context.Context, entitySource input.EntitySource) ([]deppy.Variable, error) {
+func (i *ThingVariableSource) GetVariables(ctx context.Context, entitySource input.EntitySource) ([]deppy.Variable, error) {
 	var variables []deppy.Variable
 	createdVariables := map[deppy.Identifier]*struct{}{}
 	err := entitySource.Iterate(ctx, func(entity *input.Entity) error {
@@ -43,7 +43,7 @@ func (i *ItemVariableSource) GetVariables(ctx context.Context, entitySource inpu
 			return fmt.Errorf("error parsing entity property (%s) to boolean: %s", EntityPropertyInstalled, err)
 		}
 
-		// remove uninstalled items outside the resolution scope
+		// remove uninstalled things outside the resolution scope
 		if _, ok := i.resolutionScope[entity.ID]; !ok && !installed {
 			return nil
 		}

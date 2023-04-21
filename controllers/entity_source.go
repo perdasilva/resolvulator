@@ -23,25 +23,25 @@ type EntitySource struct {
 	*input.CacheEntitySource
 }
 
-func NewEntitySource(items []v1alpha1.Item) *EntitySource {
+func NewEntitySource(things []v1alpha1.Thing) *EntitySource {
 	entityCache := map[deppy.Identifier]input.Entity{}
-	for _, item := range items {
-		itemID := deppy.Identifier(item.GetName())
-		itemStatus := item.Status.Phase
-		itemDependencies := strings.Join(item.Spec.Dependencies, ",")
-		itemConflicts := strings.Join(item.Spec.Conflicts, ",")
-		itemInstalled := meta.IsStatusConditionTrue(item.Status.Conditions, v1alpha1.ConditionInstalled)
-		localResolutionFailed := meta.IsStatusConditionFalse(item.Status.Conditions, v1alpha1.ConditionLocalResolutionSucceeded)
-		globalResolutionFailed := meta.IsStatusConditionFalse(item.Status.Conditions, v1alpha1.ConditionGlobalResolutionSucceeded)
-		itemEntity := input.NewEntity(itemID, map[string]string{
-			EntityPropertyStatus:                 itemStatus,
-			EntityPropertyDependencies:           itemDependencies,
-			EntityPropertyConflicts:              itemConflicts,
-			EntityPropertyInstalled:              fmt.Sprintf("%t", itemInstalled),
+	for _, thing := range things {
+		id := deppy.Identifier(thing.GetName())
+		status := thing.Status.Phase
+		dependencies := strings.Join(thing.Spec.Dependencies, ",")
+		conflicts := strings.Join(thing.Spec.Conflicts, ",")
+		isInstalled := meta.IsStatusConditionTrue(thing.Status.Conditions, v1alpha1.ConditionInstalled)
+		localResolutionFailed := meta.IsStatusConditionFalse(thing.Status.Conditions, v1alpha1.ConditionLocalResolutionSucceeded)
+		globalResolutionFailed := meta.IsStatusConditionFalse(thing.Status.Conditions, v1alpha1.ConditionGlobalResolutionSucceeded)
+		entity := input.NewEntity(id, map[string]string{
+			EntityPropertyStatus:                 status,
+			EntityPropertyDependencies:           dependencies,
+			EntityPropertyConflicts:              conflicts,
+			EntityPropertyInstalled:              fmt.Sprintf("%t", isInstalled),
 			EntityPropertyLocalResolutionFailed:  fmt.Sprintf("%t", localResolutionFailed),
 			EntityPropertyGlobalResolutionFailed: fmt.Sprintf("%t", globalResolutionFailed),
 		})
-		entityCache[itemID] = *itemEntity
+		entityCache[id] = *entity
 	}
 	return &EntitySource{
 		CacheEntitySource: input.NewCacheQuerier(entityCache),

@@ -20,9 +20,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
 const (
 	PhaseNewlyCreated             = ""
 	PhaseReachingContextConsensus = "ReachingContextConsensus"
@@ -38,14 +35,17 @@ const (
 	ConditionInstalled                 = "BundleInstalled"
 )
 
-// ItemSpec defines the desired state of Item
-type ItemSpec struct {
+// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
+// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
+
+// ThingSpec defines the desired state of Thing
+type ThingSpec struct {
 	Dependencies []string `json:"dependencies,omitempty"`
 	Conflicts    []string `json:"conflicts,omitempty"`
 }
 
-// ItemStatus defines the observed state of Item
-type ItemStatus struct {
+// ThingStatus defines the observed state of Thing
+type ThingStatus struct {
 	Phase              string             `json:"phase,omitempty"`
 	ObservedGeneration int64              `json:"observedGeneration,omitempty"`
 	Conditions         []metav1.Condition `json:"conditions,omitempty"`
@@ -57,24 +57,24 @@ type ItemStatus struct {
 //+kubebuilder:printcolumn:name=Phase,type=string,JSONPath=`.status.phase`
 //+kubebuilder:printcolumn:name=Age,type=date,JSONPath=`.metadata.creationTimestamp`
 
-// Item is the Schema for the items API
-type Item struct {
+// Thing is the Schema for the things API
+type Thing struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   ItemSpec   `json:"spec,omitempty"`
-	Status ItemStatus `json:"status,omitempty"`
+	Spec   ThingSpec   `json:"spec,omitempty"`
+	Status ThingStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 
-// ItemList contains a list of Item
-type ItemList struct {
+// ThingList contains a list of Thing
+type ThingList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []Item `json:"items"`
+	Items           []Thing `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&Item{}, &ItemList{})
+	SchemeBuilder.Register(&Thing{}, &ThingList{})
 }

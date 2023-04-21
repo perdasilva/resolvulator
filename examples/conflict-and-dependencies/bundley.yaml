@@ -1,9 +1,9 @@
 apiVersion: resolvulator.resolvulator.io/v1alpha1
-kind: Item
+kind: Thing
 metadata:
   labels:
-    app.kubernetes.io/name: item
-    app.kubernetes.io/instance: item-sample
+    app.kubernetes.io/name: thing
+    app.kubernetes.io/instance: thing-sample
     app.kubernetes.io/part-of: resolvulator
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/created-by: resolvulator
