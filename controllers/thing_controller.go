@@ -21,6 +21,7 @@ import (
 	"time"
 
 	resolvulatorv1alpha1 "github.com/perdasilva/resolvulator/api/v1alpha1"
+	"github.com/perdasilva/resolvulator/internal/resolver"
 	"k8s.io/apimachinery/pkg/api/meta"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -39,7 +40,7 @@ const resolvulatorFinalizerName = "resolvulator.io/finalizer"
 type ThingReconciler struct {
 	client.Client
 	Scheme   *runtime.Scheme
-	resolver *Resolver
+	resolver *resolver.Resolver
 }
 
 //+kubebuilder:rbac:groups=resolvulator.resolvulator.io,resources=things,verbs=get;list;watch;create;update;patch;delete
@@ -163,7 +164,7 @@ func (r *ThingReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ThingReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	r.resolver = NewResolver(context.Background(), r.Client)
+	r.resolver = resolver.NewResolver(context.Background(), r.Client)
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&resolvulatorv1alpha1.Thing{}).
