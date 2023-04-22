@@ -1,0 +1,12 @@
+apiVersion: resolvulator.resolvulator.io/v1alpha1
+kind: InstalledThing
+metadata:
+  labels:
+    app.kubernetes.io/name: installedthing
+    app.kubernetes.io/instance: installedthing-sample
+    app.kubernetes.io/part-of: resolvulator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: resolvulator
+  name: installedthing-sample
+spec:
+  # TODO(user): Add fields here

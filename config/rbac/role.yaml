@@ -8,6 +8,32 @@ rules:
 - apiGroups:
   - resolvulator.resolvulator.io
   resources:
+  - installedthings
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - resolvulator.resolvulator.io
+  resources:
+  - installedthings/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - resolvulator.resolvulator.io
+  resources:
+  - installedthings/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - resolvulator.resolvulator.io
+  resources:
   - things
   verbs:
   - create
