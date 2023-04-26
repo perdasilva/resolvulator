@@ -25,15 +25,13 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/rand"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
-const resolvulatorFinalizerName = "resolvulator.io/finalizer"
+const requeueDelay = 3 * time.Second
 
 // ThingReconciler reconciles a Thing object
 type ThingReconciler struct {
@@ -56,7 +54,27 @@ func (r *ThingReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	// get thing
 	thing := &resolvulatorv1alpha1.Thing{}
 	if err := r.Client.Get(ctx, req.NamespacedName, thing); err != nil {
-		return ctrl.Result{}, err
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	// add finalizer to handle resource deletion
+	if thing.ObjectMeta.DeletionTimestamp.IsZero() {
+		if !controllerutil.ContainsFinalizer(thing, resolutionControllerFinalizer) {
+			controllerutil.AddFinalizer(thing, resolutionControllerFinalizer)
+			if err := r.Update(ctx, thing); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+	} else {
+		// The object is being deleted
+		if controllerutil.ContainsFinalizer(thing, resolutionControllerFinalizer) {
+			// remove finalizer
+			controllerutil.RemoveFinalizer(thing, resolutionControllerFinalizer)
+			if err := r.Update(ctx, thing); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+		return ctrl.Result{}, nil
 	}
 
 	// get corresponding installed thing if it exists
@@ -65,7 +83,6 @@ func (r *ThingReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 			Name: thing.Name,
 		},
 	}
-
 	if err := controllerutil.SetOwnerReference(thing, &desiredInstalledThing, r.Scheme); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -91,13 +108,18 @@ func (r *ThingReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		return ctrl.Result{}, err
 	}
 
+	// if the resolver conditions are met and the installed thing does not exist, create it
 	resolverConditionsMet := meta.IsStatusConditionTrue(thing.Status.Conditions, resolvulatorv1alpha1.ConditionGlobalResolutionSucceeded)
-
 	if !(isInstalled) && resolverConditionsMet {
 		return ctrl.Result{}, r.Client.Create(ctx, &desiredInstalledThing)
 	}
 
-	return ctrl.Result{Requeue: !resolverConditionsMet}, nil
+	// if resolver conditions aren't met, requeue the event
+	if !resolverConditionsMet {
+		return ctrl.Result{RequeueAfter: requeueDelay}, nil
+	}
+
+	return ctrl.Result{}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -105,17 +127,6 @@ func (r *ThingReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&resolvulatorv1alpha1.Thing{}).
 		Owns(&resolvulatorv1alpha1.InstalledThing{}).
-		WithEventFilter(&predicate.GenerationChangedPredicate{}).
+		// WithEventFilter(&predicate.GenerationChangedPredicate{}).
 		Complete(r)
-}
-
-func (r *ThingReconciler) waitAndUpdatePhase(ctx context.Context, thing *resolvulatorv1alpha1.Thing, phase string) error {
-	time.Sleep(time.Duration(rand.Int63nRange(1, 3)) * time.Second)
-	return r.updatePhase(ctx, thing, phase)
-}
-
-func (r *ThingReconciler) updatePhase(ctx context.Context, thing *resolvulatorv1alpha1.Thing, phase string) error {
-	thingCopy := thing.DeepCopy()
-	thingCopy.Status.Phase = phase
-	return r.Client.Status().Update(ctx, thingCopy)
 }

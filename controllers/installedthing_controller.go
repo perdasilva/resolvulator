@@ -63,7 +63,7 @@ func (r *InstalledThingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	meta.SetStatusCondition(&installedThing.Status.Conditions, metav1.Condition{
 		Type:               "Installed",
 		Reason:             "InstallSucceeded",
-		Message:            "Installed thing is iunstalled",
+		Message:            "Installed thing is installed",
 		Status:             metav1.ConditionTrue,
 		ObservedGeneration: installedThing.Generation,
 		LastTransitionTime: metav1.Now(),

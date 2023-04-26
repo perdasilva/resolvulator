@@ -29,15 +29,12 @@ type InstalledThingSpec struct {
 
 // InstalledThingStatus defines the observed state of InstalledThing
 type InstalledThingStatus struct {
-	Phase              string             `json:"phase,omitempty"`
-	ObservedGeneration int64              `json:"observedGeneration,omitempty"`
-	Conditions         []metav1.Condition `json:"conditions,omitempty"`
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 //+kubebuilder:resource:scope=Cluster
 //+kubebuilder:subresource:status
-//+kubebuilder:printcolumn:name=Phase,type=string,JSONPath=`.status.phase`
 //+kubebuilder:printcolumn:name=Age,type=date,JSONPath=`.metadata.creationTimestamp`
 
 // InstalledThing is the Schema for the installedthings API

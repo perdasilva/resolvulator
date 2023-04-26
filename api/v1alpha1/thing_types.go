@@ -46,9 +46,7 @@ type ThingSpec struct {
 
 // ThingStatus defines the observed state of Thing
 type ThingStatus struct {
-	Phase              string             `json:"phase,omitempty"`
-	ObservedGeneration int64              `json:"observedGeneration,omitempty"`
-	Conditions         []metav1.Condition `json:"conditions,omitempty"`
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
 //+kubebuilder:object:root=true

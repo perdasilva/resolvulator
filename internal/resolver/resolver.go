@@ -21,6 +21,8 @@ import (
 
 type MultiStageResolver interface {
 	GetResolution(name types.NamespacedName) Resolution
+	NotifyDeletion(thing *v1alpha1.Thing)
+	NotifySpecChange(thing *v1alpha1.Thing)
 }
 
 const (
@@ -70,7 +72,7 @@ func (r *Resolver) NotifyDeletion(thing *v1alpha1.Thing) {
 	defer r.lock.Unlock()
 	r.logger.Info("thing deleted", "thing", thing.GetName())
 	delete(r.resolutionState, thing.GetName())
-	r.EnqueueResolution()
+	r.enqueueResolution()
 }
 
 func (r *Resolver) NotifySpecChange(thing *v1alpha1.Thing) {
@@ -88,7 +90,7 @@ func (r *Resolver) NotifySpecChange(thing *v1alpha1.Thing) {
 			ObservedGeneration: thing.Generation,
 		},
 	}
-	r.EnqueueResolution()
+	r.enqueueResolution()
 }
 
 func (r *Resolver) updateResolution(thingName string, resolution Resolution) {
@@ -116,7 +118,7 @@ func (r *Resolver) GetResolution(thing types.NamespacedName) Resolution {
 	return resolution
 }
 
-func (r *Resolver) EnqueueResolution() {
+func (r *Resolver) enqueueResolution() {
 	select {
 	case <-r.ctx.Done():
 	case r.requestChannel <- "resolve":
@@ -143,7 +145,7 @@ func (r *Resolver) startResolutionContextWatcher() {
 					r.logger.Info("resolution context gathered", "time", time.Now())
 					if err := r.resolve(); err != nil {
 						fmt.Printf("failed to resolve: %v\n", err.Error())
-						r.EnqueueResolution() // try again
+						r.enqueueResolution() // try again
 					}
 					// reset input collection
 					lastRequestTime = time.Time{}
@@ -189,7 +191,7 @@ func (r *Resolver) resolve() error {
 	var successfullyResolvedThings []v1alpha1.Thing
 	for _, thing := range thingList.Items {
 		resolutionLogger.Info("resolve thing", "thing", thing.GetName())
-		if err := r.RunLocalResolution(r.ctx, &thing, thingList.Items, installedThingList.Items); err != nil {
+		if err := r.runLocalResolution(r.ctx, thing, thingList.Items, installedThingList.Items); err != nil {
 
 			resolutionLogger.Error(err, "failed to resolve thing", "thing", thing.GetName())
 			r.updateResolution(thing.GetName(), Resolution{
@@ -226,6 +228,7 @@ func (r *Resolver) resolve() error {
 		}
 	}
 
+	// run global resolution
 	for len(successfullyResolvedThings) > 0 {
 		thingNames = []string{}
 		for _, thing := range successfullyResolvedThings {
@@ -233,7 +236,9 @@ func (r *Resolver) resolve() error {
 		}
 		resolutionLogger.Info("successfully resolved things", "things", thingNames)
 		resolutionLogger.Info("starting global resolution")
-		err := r.RunGlobalResolution(r.ctx, successfullyResolvedThings, installedThingList.Items)
+		err := r.runGlobalResolution(r.ctx, successfullyResolvedThings, installedThingList.Items)
+
+		// weed out failing things
 		if err != nil {
 			switch err.(type) {
 			case deppy.NotSatisfiable:
@@ -301,19 +306,19 @@ func (r *Resolver) resolve() error {
 				},
 			})
 		}
+		resolutionLogger.Info("finished global resolution", "successfullyResolvedThings", thingNames, "installedThings", installedThingNames)
 		break
 	}
 	return nil
 }
 
-func (r *Resolver) RunLocalResolution(ctx context.Context, thing *v1alpha1.Thing, things []v1alpha1.Thing, installedThings []v1alpha1.InstalledThing) error {
+func (r *Resolver) runResolution(ctx context.Context, things []v1alpha1.Thing, installedThings []v1alpha1.InstalledThing, requiredThings ...v1alpha1.Thing) error {
 	entitySource := NewEntitySource(things, installedThings)
-	variableSource := NewRequiredThingVariableSource(*thing)
+	variableSource := NewRequiredThingVariableSource(requiredThings...)
 	resolver, err := solver.NewDeppySolver(entitySource, variableSource)
 	if err != nil {
 		return err
 	}
-	// TODO: fix deppy solver error handling
 	solution, err := resolver.Solve(ctx)
 	if err != nil {
 		return err
@@ -324,20 +329,10 @@ func (r *Resolver) RunLocalResolution(ctx context.Context, thing *v1alpha1.Thing
 	return nil
 }
 
-func (r *Resolver) RunGlobalResolution(ctx context.Context, things []v1alpha1.Thing, installedThings []v1alpha1.InstalledThing) error {
-	entitySource := NewEntitySource(things, installedThings)
-	variableSource := NewRequiredThingVariableSource(things...)
-	resolver, err := solver.NewDeppySolver(entitySource, variableSource)
-	if err != nil {
-		return err
-	}
-	// TODO: fix deppy solver error handling
-	solution, err := resolver.Solve(ctx)
-	if err != nil {
-		return err
-	}
-	if len(solution.Error().(deppy.NotSatisfiable)) > 0 {
-		return solution.Error()
-	}
-	return nil
+func (r *Resolver) runLocalResolution(ctx context.Context, thing v1alpha1.Thing, things []v1alpha1.Thing, installedThings []v1alpha1.InstalledThing) error {
+	return r.runResolution(ctx, things, installedThings, thing)
+}
+
+func (r *Resolver) runGlobalResolution(ctx context.Context, things []v1alpha1.Thing, installedThings []v1alpha1.InstalledThing) error {
+	return r.runResolution(ctx, things, installedThings, things...)
 }

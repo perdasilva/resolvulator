@@ -57,6 +57,7 @@ func (r RequiredThingVariableSource) GetVariables(ctx context.Context, entitySou
 				),
 			)
 		} else {
+			// add conflicts
 			for _, conflict := range strings.Split(entity.Properties[EntityPropertyConflicts], ",") {
 				conflict = strings.TrimSpace(conflict)
 				if conflict == "" {
@@ -65,14 +66,37 @@ func (r RequiredThingVariableSource) GetVariables(ctx context.Context, entitySou
 				variable.AddConstraint(constraint.Conflict(deppy.Identifier(conflict)))
 				pkgQueue = append(pkgQueue, deppy.Identifier(conflict))
 			}
-			for _, dependency := range strings.Split(entity.Properties[EntityPropertyDependencies], ",") {
-				dependency = strings.TrimSpace(dependency)
-				if dependency == "" {
+
+			// add dependency constraints
+			for _, dependencyId := range strings.Split(entity.Properties[EntityPropertyDependencies], ",") {
+				if dependencyId == "" {
 					continue
 				}
-				variable.AddConstraint(constraint.Dependency(deppy.Identifier(dependency)))
-				pkgQueue = append(pkgQueue, deppy.Identifier(dependency))
+				dependency, err := entitySource.Get(ctx, deppy.Identifier(dependencyId))
+				if err != nil {
+					return nil, err
+				}
+
+				variable.AddConstraint(constraint.Dependency(dependency.Identifier()))
+				isInstalled := dependency.Properties[EntityPropertyInstalled] == "true"
+
+				if !(isInstalled) {
+					installedVariableID := "isInstalled/" + dependency.Identifier()
+					variables = append(variables, input.NewSimpleVariable(
+						installedVariableID,
+						constraint.NewUserFriendlyConstraint(
+							constraint.Prohibited(),
+							func(constraint deppy.Constraint, subject deppy.Identifier) string {
+								return fmt.Sprintf("package %s is required by %s but it is not installed", dependency.Identifier(), entity.Identifier())
+							},
+						),
+					))
+					variable.AddConstraint(constraint.Dependency(installedVariableID))
+				}
+
+				pkgQueue = append(pkgQueue, dependency.Identifier())
 			}
+
 			if entity.Properties[EntityPropertyInstalled] == "true" {
 				variable.AddConstraint(constraint.Mandatory())
 			}
