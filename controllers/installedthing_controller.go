@@ -19,6 +19,8 @@ package controllers
 import (
 	"context"
 
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -48,9 +50,28 @@ type InstalledThingReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.13.1/pkg/reconcile
 func (r *InstalledThingReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
+	installedThing := &resolvulatorv1alpha1.InstalledThing{}
+	if err := r.Client.Get(ctx, req.NamespacedName, installedThing); err != nil {
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
 
-	// TODO(user): your logic here
+	// installed thing is being deleted - all good
+	if !(installedThing.ObjectMeta.DeletionTimestamp.IsZero()) {
+		return ctrl.Result{}, nil
+	}
 
+	meta.SetStatusCondition(&installedThing.Status.Conditions, metav1.Condition{
+		Type:               "Installed",
+		Reason:             "InstallSucceeded",
+		Message:            "Installed thing is iunstalled",
+		Status:             metav1.ConditionTrue,
+		ObservedGeneration: installedThing.Generation,
+		LastTransitionTime: metav1.Now(),
+	})
+
+	if err := r.Client.Status().Update(ctx, installedThing); err != nil {
+		return ctrl.Result{}, err
+	}
 	return ctrl.Result{}, nil
 }
 

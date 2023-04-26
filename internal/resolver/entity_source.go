@@ -7,7 +7,6 @@ import (
 	"github.com/operator-framework/deppy/pkg/deppy"
 	"github.com/operator-framework/deppy/pkg/deppy/input"
 	"github.com/perdasilva/resolvulator/api/v1alpha1"
-	"k8s.io/apimachinery/pkg/api/meta"
 )
 
 const (
@@ -23,23 +22,24 @@ type EntitySource struct {
 	*input.CacheEntitySource
 }
 
-func NewEntitySource(things []v1alpha1.Thing) *EntitySource {
+func NewEntitySource(things []v1alpha1.Thing, installedThings []v1alpha1.InstalledThing) *EntitySource {
 	entityCache := map[deppy.Identifier]input.Entity{}
+
+	// collect installed packages
+	installedPkgs := map[deppy.Identifier]struct{}{}
+	for _, installedThing := range installedThings {
+		installedPkgs[deppy.Identifier(installedThing.GetName())] = struct{}{}
+	}
+
 	for _, thing := range things {
 		id := deppy.Identifier(thing.GetName())
-		status := thing.Status.Phase
 		dependencies := strings.Join(thing.Spec.Dependencies, ",")
 		conflicts := strings.Join(thing.Spec.Conflicts, ",")
-		isInstalled := meta.IsStatusConditionTrue(thing.Status.Conditions, v1alpha1.ConditionInstalled)
-		localResolutionFailed := meta.IsStatusConditionFalse(thing.Status.Conditions, v1alpha1.ConditionLocalResolutionSucceeded)
-		globalResolutionFailed := meta.IsStatusConditionFalse(thing.Status.Conditions, v1alpha1.ConditionGlobalResolutionSucceeded)
+		_, isInstalled := installedPkgs[id]
 		entity := input.NewEntity(id, map[string]string{
-			EntityPropertyStatus:                 status,
-			EntityPropertyDependencies:           dependencies,
-			EntityPropertyConflicts:              conflicts,
-			EntityPropertyInstalled:              fmt.Sprintf("%t", isInstalled),
-			EntityPropertyLocalResolutionFailed:  fmt.Sprintf("%t", localResolutionFailed),
-			EntityPropertyGlobalResolutionFailed: fmt.Sprintf("%t", globalResolutionFailed),
+			EntityPropertyDependencies: dependencies,
+			EntityPropertyConflicts:    conflicts,
+			EntityPropertyInstalled:    fmt.Sprintf("%t", isInstalled),
 		})
 		entityCache[id] = *entity
 	}

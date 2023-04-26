@@ -20,6 +20,7 @@ import (
 	"flag"
 	"os"
 
+	"github.com/perdasilva/resolvulator/internal/resolver"
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -88,9 +89,14 @@ func main() {
 		os.Exit(1)
 	}
 
+	controllerCxt := ctrl.SetupSignalHandler()
+
+	multiStageResolver := resolver.NewResolver(controllerCxt, mgr.GetClient())
+
 	if err = (&controllers.ThingReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Resolver: multiStageResolver,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Thing")
 		os.Exit(1)
@@ -100,6 +106,14 @@ func main() {
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "InstalledThing")
+		os.Exit(1)
+	}
+	if err = (&controllers.ResolutionController{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Resolver: multiStageResolver,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Resolution")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder
@@ -114,7 +128,7 @@ func main() {
 	}
 
 	setupLog.Info("starting manager")
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+	if err := mgr.Start(controllerCxt); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
